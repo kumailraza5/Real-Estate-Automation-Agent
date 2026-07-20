@@ -4,7 +4,7 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-const dbUrl = process.env.SUPABASE_DATABASE_URL ?? process.env.DATABASE_URL;
+let dbUrl = process.env.SUPABASE_DATABASE_URL ?? process.env.DATABASE_URL;
 
 if (!dbUrl) {
   throw new Error(
@@ -12,7 +12,14 @@ if (!dbUrl) {
   );
 }
 
-export const pool = new Pool({ connectionString: dbUrl });
+// Supabase transaction pooler (6543) is blocked in some environments; use session pooler (5432)
+dbUrl = dbUrl.replace(/:6543\//, ":5432/");
+// Percent-encode special characters (e.g. &) in password so pg parses the URL correctly
+dbUrl = dbUrl.replace(/\/\/([^:]+):([^@]+)@/, (_: string, user: string, pass: string) => {
+  return `//${user}:${encodeURIComponent(pass)}@`;
+});
+
+export const pool = new Pool({ connectionString: dbUrl, ssl: { rejectUnauthorized: false } });
 export const db = drizzle(pool, { schema });
 
 export * from "./schema";
