@@ -1,0 +1,347 @@
+Build a production-ready SaaS application called "Real Estate Operations Agent".
+
+The goal of this platform is NOT to create a chatbot. This is an internal business automation platform for real estate companies that automates repetitive operational tasks and improves productivity.
+
+The platform should follow modern enterprise SaaS architecture with a clean, scalable, and modular codebase.
+
+=========================
+TECH STACK
+=========================
+
+Frontend
+- React 19
+- TypeScript
+- Vite
+- Tailwind CSS
+- shadcn/ui
+- React Router
+- TanStack Query
+- React Hook Form
+- Zod
+
+Backend
+- Node.js
+- Express.js
+- TypeScript
+- Prisma ORM
+- JWT Authentication
+- bcrypt
+
+Database
+- Supabase PostgreSQL
+
+Storage
+- Supabase Storage
+
+Deployment
+- Render
+
+Validation
+- Zod
+
+Logging
+- Pino
+
+Scheduling
+- node-cron
+
+The architecture should be modular so future AI and automation integrations can easily be added.
+
+=========================
+PROJECT STRUCTURE
+=========================
+
+client/
+server/
+shared/
+
+Use clean architecture.
+
+Separate:
+
+Controllers
+
+Routes
+
+Services
+
+Middleware
+
+Automation Engine
+
+Workflow Engine
+
+Utilities
+
+Validation
+
+Database
+
+=========================
+CORE MODULES
+=========================
+
+Authentication
+
+- Login
+- Register
+- Forgot Password
+- JWT Authentication
+- User Roles
+
+Dashboard
+
+- Statistics
+- Today's Tasks
+- Active Leads
+- Upcoming Follow-ups
+- Recent Activity
+- Automation Overview
+
+Lead Center
+
+- Add Lead
+- Edit Lead
+- Lead Details
+- Lead Status
+- Lead Score
+- Assign Agent
+
+Property Management
+
+- Properties
+- Listings
+- Availability
+- Assigned Leads
+
+CRM
+
+- Clients
+- Notes
+- Documents
+- Activity Timeline
+
+Task Management
+
+- Follow-ups
+- Calls
+- Meetings
+- Reminders
+
+Calendar
+
+- Viewings
+- Meetings
+- Follow-ups
+
+Reports
+
+- Lead Conversion
+- Team Performance
+- Automation Activity
+
+Settings
+
+- Company
+- Team Members
+- Notification Settings
+
+=========================
+MAIN FEATURE
+=========================
+
+The main feature is an Automation Agent.
+
+This is NOT a chatbot.
+
+This is an internal workflow automation engine.
+
+Users should be able to create workflows.
+
+Workflow Builder should support:
+
+Trigger
+
+↓
+
+Conditions
+
+↓
+
+Actions
+
+Example:
+
+WHEN
+
+New Lead Created
+
+IF
+
+Budget > $500,000
+
+THEN
+
+Assign Senior Agent
+
+Create Follow-up
+
+Notify Manager
+
+Update CRM
+
+Another example:
+
+WHEN
+
+No Response For 48 Hours
+
+THEN
+
+Create Reminder
+
+Notify Assigned Agent
+
+Move Lead To Follow-up
+
+Another example:
+
+WHEN
+
+Viewing Completed
+
+THEN
+
+Update CRM
+
+Create Next Follow-up
+
+Notify Sales Manager
+
+=========================
+AUTOMATION ENGINE
+=========================
+
+The backend should include an Automation Engine.
+
+Whenever an event occurs:
+
+Lead Created
+
+Lead Updated
+
+Viewing Scheduled
+
+Deal Closed
+
+The engine should automatically:
+
+Read workflow rules
+
+Evaluate conditions
+
+Execute actions
+
+Log execution
+
+Update CRM
+
+Create Tasks
+
+Generate Notifications
+
+Everything should be event-driven.
+
+=========================
+DATABASE
+=========================
+
+Create proper Prisma models for:
+
+Users
+
+Companies
+
+Agents
+
+Leads
+
+Clients
+
+Properties
+
+Tasks
+
+Appointments
+
+Workflow Rules
+
+Workflow Executions
+
+Notifications
+
+Activity Logs
+
+Documents
+
+=========================
+UI
+=========================
+
+Modern SaaS Dashboard
+
+Responsive
+
+Professional
+
+Enterprise Design
+
+Dark / Light Mode
+
+Collapsible Sidebar
+
+Beautiful Tables
+
+Charts
+
+Statistics Cards
+
+Loading Skeletons
+
+Toast Notifications
+
+=========================
+CODE QUALITY
+=========================
+
+Use TypeScript everywhere.
+
+No duplicated code.
+
+Reusable components.
+
+Reusable services.
+
+Reusable hooks.
+
+Proper folder structure.
+
+Proper API architecture.
+
+Proper validation.
+
+Proper error handling.
+
+Production-ready code.
+
+=========================
+IMPORTANT
+=========================
+
+Do NOT build an AI chatbot.
+
+Do NOT integrate OpenAI, Claude, Gemini, or any external AI API.
+
+Build the project so AI modules can easily be added in future without changing the architecture.
+
+The first version is a Real Estate Operations Automation Platform focused on internal workflow automation.

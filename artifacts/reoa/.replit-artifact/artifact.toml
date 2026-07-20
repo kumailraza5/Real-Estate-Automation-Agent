@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "Real Estate Operations Agent"
+version = "1.0.0"
+id = "artifacts/reoa"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 20425
+
+[services.development]
+run = "pnpm --filter @workspace/reoa run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/reoa", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/reoa/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "20425"
+BASE_PATH = "/"
