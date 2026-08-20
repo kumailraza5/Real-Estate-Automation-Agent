@@ -337,7 +337,7 @@ function CreatePropertyForm({ onSuccess }: { onSuccess: () => void }) {
   });
 
   const onSubmit = (data: z.infer<typeof propertySchema>) => {
-    createProperty.mutate({ data }, {
+    createProperty.mutate({ data: data as any }, {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: getListPropertiesQueryKey() });
         toast.success("Property added successfully!");

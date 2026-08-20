@@ -139,10 +139,10 @@ export default function LeadDetail() {
         <Link href="/leads">Back to Leads</Link>
       </div>
 
-      {lead.clientId && (
+      {(lead as any).clientId && (
         <div className="bg-primary/10 border border-primary/20 rounded-md p-4 mb-6 flex items-center justify-between">
           <p className="text-sm font-medium">This lead has been converted to a client.</p>
-          <Link href={`/clients/${lead.clientId}`} className="text-sm font-bold text-primary hover:underline">
+          <Link href={`/clients/${(lead as any).clientId}`} className="text-sm font-bold text-primary hover:underline">
             View Client Record →
           </Link>
         </div>

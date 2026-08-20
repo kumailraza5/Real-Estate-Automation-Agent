@@ -112,9 +112,9 @@ export default function ClientDetail() {
             <p className="text-muted-foreground flex items-center gap-2">
               Client added on {format(new Date(client.createdAt), "MMMM d, yyyy")}
             </p>
-            {client.leadId && (
+            {(client as any).leadId && (
               <p className="text-muted-foreground flex items-center gap-2">
-                Originating Lead: <Link href={`/leads/${client.leadId}`} className="text-primary hover:underline font-medium">View Lead #{client.leadId}</Link>
+                Originating Lead: <Link href={`/leads/${(client as any).leadId}`} className="text-primary hover:underline font-medium">View Lead #{(client as any).leadId}</Link>
               </p>
             )}
           </div>

@@ -260,7 +260,7 @@ class AutomationEngine {
     return list;
   }
 
-  private async runAction(action: ActionDefinition, payload: EventPayload, wf: any): Promise<{ status: "success" | "skipped"; note?: string } | void> {
+  private async runAction(action: ActionDefinition, payload: EventPayload, wf: any): Promise<{ status: "success" | "skipped" | "failed"; note?: string } | void> {
     switch (action.type) {
       case "ASSIGN_SENIOR_AGENT":
       case "ASSIGN_AGENT": {

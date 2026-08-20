@@ -149,7 +149,7 @@ export default function Clients() {
                         </div>
                         <div>
                           <p className="font-medium">{client.firstName} {client.lastName}</p>
-                          <p className="text-xs text-muted-foreground capitalize">{client.source || "—"}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{(client as any).source || "—"}</p>
                         </div>
                       </div>
                     </TableCell>
