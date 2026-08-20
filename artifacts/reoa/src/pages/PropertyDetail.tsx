@@ -3,26 +3,278 @@ import { useParams, Link } from "wouter";
 import { 
   useGetProperty, 
   getGetPropertyQueryKey,
+  useUpdateProperty,
+  getListPropertiesQueryKey,
   useListAgents
 } from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { 
   Building2, MapPin, BedDouble, Bath, Maximize, 
   ArrowLeft, Edit, DollarSign, Home, Image as ImageIcon 
 } from "lucide-react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { toast } from "sonner";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { PROPERTY_TYPES } from "@/lib/constants";
+
+const editPropertySchema = z.object({
+  title: z.string().min(3, "Title must be at least 3 characters"),
+  address: z.string().min(5),
+  city: z.string().min(2),
+  price: z.coerce.number().min(1, "Price is required"),
+  type: z.string().min(1, "Select a property type"),
+  status: z.string(),
+  bedrooms: z.coerce.number().optional(),
+  bathrooms: z.coerce.number().optional(),
+  area: z.coerce.number().optional(),
+  description: z.string().optional(),
+});
+
+function EditPropertyModal({ property, propertyId }: { property: any; propertyId: number }) {
+  const [open, setOpen] = useState(false);
+  const queryClient = useQueryClient();
+  const updateProperty = useUpdateProperty();
+
+  const form = useForm<z.infer<typeof editPropertySchema>>({
+    resolver: zodResolver(editPropertySchema),
+    defaultValues: {
+      title: property.title || "",
+      address: property.address || "",
+      city: property.city || "",
+      price: property.price || 0,
+      type: property.type || "residential",
+      status: property.status || "available",
+      bedrooms: property.bedrooms || 0,
+      bathrooms: property.bathrooms || 0,
+      area: property.area || 0,
+      description: property.description || "",
+    },
+  });
+
+  const onSubmit = (data: z.infer<typeof editPropertySchema>) => {
+    updateProperty.mutate(
+      { id: propertyId, data },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: getGetPropertyQueryKey(propertyId), exact: true });
+          queryClient.invalidateQueries({ queryKey: getListPropertiesQueryKey() });
+          toast.success("Property updated successfully!");
+          setOpen(false);
+        },
+        onError: (err: any) => {
+          toast.error(err.message || "Failed to update property");
+        },
+      }
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger asChild>
+        <Button variant="outline" size="icon">
+          <Edit className="h-4 w-4" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Property</DialogTitle>
+        </DialogHeader>
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+            <FormField
+              control={form.control}
+              name="title"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Property Title</FormLabel>
+                  <FormControl>
+                    <Input {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="address"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="city"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>City</FormLabel>
+                    <FormControl>
+                      <Input {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {PROPERTY_TYPES.map((t) => (
+                          <SelectItem key={t.value} value={t.value}>
+                            {t.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="status"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Status</FormLabel>
+                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="available">Available</SelectItem>
+                        <SelectItem value="under-offer">Under Offer</SelectItem>
+                        <SelectItem value="sold">Sold</SelectItem>
+                        <SelectItem value="rented">Rented</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="price"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Price ($)</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="area"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Area (sqm)</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="bedrooms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bedrooms</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="bathrooms"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Bathrooms</FormLabel>
+                    <FormControl>
+                      <Input type="number" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Description</FormLabel>
+                  <FormControl>
+                    <Textarea rows={3} {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <Button type="submit" className="w-full" disabled={updateProperty.isPending}>
+              {updateProperty.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </form>
+        </Form>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function PropertyDetail() {
   const { id } = useParams<{ id: string }>();
   const propertyId = parseInt(id || "0", 10);
   
   const { data: property, isLoading } = useGetProperty(propertyId, { 
-    query: { enabled: !!propertyId, queryKey: [getGetPropertyQueryKey(propertyId)] } 
+    query: { enabled: !!propertyId, queryKey: getGetPropertyQueryKey(propertyId) } 
   });
   
   if (isLoading) {
@@ -73,9 +325,7 @@ export default function PropertyDetail() {
           <div className="text-3xl font-bold font-display text-primary">
             ${property.price.toLocaleString()}
           </div>
-          <Button variant="outline" size="icon">
-            <Edit className="h-4 w-4" />
-          </Button>
+          <EditPropertyModal property={property} propertyId={propertyId} />
         </div>
       </div>
 

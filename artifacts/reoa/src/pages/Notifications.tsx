@@ -1,10 +1,10 @@
-import { useListNotifications, useMarkAllNotificationsRead } from "@workspace/api-client-react";
+import { useListNotifications, useMarkAllNotificationsRead, useMarkNotificationRead, getListNotificationsQueryKey } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { Bell, Check, Info, AlertTriangle, AlertCircle, CheckCircle2 } from "lucide-react";
 import { toast } from "sonner";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -12,12 +12,21 @@ export default function Notifications() {
   const queryClient = useQueryClient();
   const { data: notifications, isLoading } = useListNotifications();
   const markAllRead = useMarkAllNotificationsRead();
+  const markSingleRead = useMarkNotificationRead();
 
   const handleMarkAllRead = () => {
     markAllRead.mutate(undefined, {
       onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: ["/api/notifications"] });
+        queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
         toast.success("All notifications marked as read");
+      }
+    });
+  };
+
+  const handleMarkSingleRead = (id: number) => {
+    markSingleRead.mutate({ id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListNotificationsQueryKey() });
       }
     });
   };
@@ -56,10 +65,11 @@ export default function Notifications() {
                 <p className="mt-1">You have no new notifications.</p>
               </div>
             ) : (
-              notifications?.map((notification) => (
+              (Array.isArray(notifications) ? notifications : []).map((notification) => (
                 <div 
                   key={notification.id} 
-                  className={`p-4 md:p-6 flex gap-4 transition-colors hover:bg-muted/30 \${notification.isRead ? 'opacity-70' : 'bg-primary/5'}`}
+                  onClick={() => !notification.isRead && handleMarkSingleRead(notification.id)}
+                  className={`p-4 md:p-6 flex gap-4 transition-colors hover:bg-muted/30 ${notification.isRead ? 'opacity-70' : 'bg-primary/5 cursor-pointer'}`}
                 >
                   <div className="shrink-0 mt-1">
                     {notification.type === 'info' && <div className="p-2 bg-blue-500/10 text-blue-500 rounded-full"><Info className="h-5 w-5" /></div>}

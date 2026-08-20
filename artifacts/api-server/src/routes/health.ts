@@ -8,4 +8,14 @@ router.get("/healthz", (_req, res) => {
   res.json(data);
 });
 
+import { checkAppointments, checkOverdueTasks } from "../engine/scheduler";
+
+if (process.env.NODE_ENV !== "production") {
+  router.post("/test/scheduler", async (req, res) => {
+    await checkAppointments();
+    await checkOverdueTasks();
+    res.json({ status: "scheduler executed manually" });
+  });
+}
+
 export default router;

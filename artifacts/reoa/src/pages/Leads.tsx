@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { useListLeads, useCreateLead, useListAgents, getListLeadsQueryKey } from "@workspace/api-client-react";
+import { useListLeads, useCreateLead, useListAgents, getListLeadsQueryKey, useDeleteLead } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { format } from "date-fns";
-import { Plus, Search, Filter, Mail, Phone, ChevronRight } from "lucide-react";
+import { Plus, Search, Filter, Mail, Phone, ChevronRight, Trash2 } from "lucide-react";
 
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { toast } from "sonner";
+import { PROPERTY_TYPES } from "@/lib/constants";
 
 const leadSchema = z.object({
   firstName: z.string().min(2),
@@ -35,12 +36,33 @@ export default function Leads() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState<number | null>(null);
+  
+  const queryClient = useQueryClient();
+  const deleteLead = useDeleteLead();
+  
+  const handleDelete = (id: number) => {
+    if (!window.confirm("Are you sure you want to delete this lead?")) return;
+    setIsDeleting(id);
+    deleteLead.mutate({ id }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListLeadsQueryKey() });
+        toast.success("Lead deleted successfully");
+      },
+      onError: (err: any) => {
+        toast.error(err.message || "Failed to delete lead");
+      },
+      onSettled: () => {
+        setIsDeleting(null);
+      }
+    });
+  };
   
   const { data: leads, isLoading } = useListLeads(
     statusFilter !== "all" ? { status: statusFilter } : undefined
   );
   
-  const filteredLeads = leads?.filter(lead => 
+  const filteredLeads = (Array.isArray(leads) ? leads : []).filter(lead => 
     lead.firstName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.lastName.toLowerCase().includes(searchTerm.toLowerCase()) ||
     lead.email.toLowerCase().includes(searchTerm.toLowerCase())
@@ -59,7 +81,7 @@ export default function Leads() {
               <Plus className="h-4 w-4" /> Add Lead
             </Button>
           </DialogTrigger>
-          <DialogContent className="sm:max-w-[500px]">
+          <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Add New Lead</DialogTitle>
             </DialogHeader>
@@ -93,6 +115,8 @@ export default function Leads() {
                 <SelectItem value="qualified">Qualified</SelectItem>
                 <SelectItem value="proposal">Proposal</SelectItem>
                 <SelectItem value="negotiation">Negotiation</SelectItem>
+                <SelectItem value="closed">Closed</SelectItem>
+                <SelectItem value="converted">Converted</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -130,11 +154,14 @@ export default function Leads() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredLeads?.map((lead) => (
+                (Array.isArray(filteredLeads) ? filteredLeads : []).map((lead) => (
                   <TableRow key={lead.id} className="group hover:bg-secondary/20 transition-colors">
                     <TableCell>
                       <div className="flex flex-col">
-                        <span className="font-medium text-foreground">{lead.firstName} {lead.lastName}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-foreground">{lead.firstName} {lead.lastName}</span>
+                          <span className="text-[10px] bg-secondary text-muted-foreground px-1.5 py-0.5 rounded font-mono">#{lead.id}</span>
+                        </div>
                         {lead.propertyType && (
                           <span className="text-xs text-muted-foreground truncate max-w-[200px]">
                             Looking for {lead.propertyType}
@@ -180,11 +207,22 @@ export default function Leads() {
                       {format(new Date(lead.createdAt), "MMM d, yyyy")}
                     </TableCell>
                     <TableCell>
-                      <Button variant="ghost" size="icon" asChild className="opacity-0 group-hover:opacity-100 transition-opacity">
-                        <Link href={`/leads/\${lead.id}`}>
-                          <ChevronRight className="h-4 w-4" />
-                        </Link>
-                      </Button>
+                      <div className="flex items-center gap-1 justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={() => handleDelete(lead.id)}
+                          disabled={isDeleting === lead.id}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <Button variant="ghost" size="icon" asChild className="h-8 w-8">
+                          <Link href={`/leads/${lead.id}`}>
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))
@@ -205,6 +243,7 @@ export function LeadStatusBadge({ status }: { status: string }) {
     proposal: "bg-orange-500/10 text-orange-600 border-orange-200",
     negotiation: "bg-pink-500/10 text-pink-600 border-pink-200",
     closed: "bg-green-500/10 text-green-600 border-green-200",
+    converted: "bg-emerald-500/10 text-emerald-600 border-emerald-200",
     lost: "bg-muted text-muted-foreground border-border",
   };
   
@@ -346,10 +385,11 @@ function CreateLeadForm({ onSuccess }: { onSuccess: () => void }) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="apartment">Apartment</SelectItem>
-                    <SelectItem value="villa">Villa</SelectItem>
-                    <SelectItem value="commercial">Commercial</SelectItem>
-                    <SelectItem value="land">Land</SelectItem>
+                    {PROPERTY_TYPES.map((t) => (
+                      <SelectItem key={t.value} value={t.value}>
+                        {t.label}
+                      </SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
                 <FormMessage />
@@ -358,28 +398,49 @@ function CreateLeadForm({ onSuccess }: { onSuccess: () => void }) {
           />
         </div>
 
-        <FormField
-          control={form.control}
-          name="assignedAgentId"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Assign To (Optional)</FormLabel>
-              <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="budget"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Budget (Optional)</FormLabel>
                 <FormControl>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select an agent" />
-                  </SelectTrigger>
+                  <Input
+                    type="number"
+                    placeholder="e.g. 750000"
+                    {...field}
+                    onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                    value={field.value ?? ''}
+                  />
                 </FormControl>
-                <SelectContent>
-                  {agents?.map(agent => (
-                    <SelectItem key={agent.id} value={agent.id.toString()}>{agent.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="assignedAgentId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Assign To (Optional)</FormLabel>
+                <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
+                  <FormControl>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select an agent" />
+                    </SelectTrigger>
+                  </FormControl>
+                  <SelectContent>
+                    {(Array.isArray(agents) ? agents : []).map(agent => (
+                      <SelectItem key={agent.id} value={agent.id.toString()}>{agent.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
 
         <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
           <Button type="button" variant="outline" onClick={onSuccess}>Cancel</Button>

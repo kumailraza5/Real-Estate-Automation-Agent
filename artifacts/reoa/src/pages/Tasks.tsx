@@ -1,12 +1,15 @@
 import { useState } from "react";
-import { useListTasks, useCreateTask, useUpdateTask, getListTasksQueryKey } from "@workspace/api-client-react";
+import { useListTasks, useCreateTask, useUpdateTask, getListTasksQueryKey, useListAgents } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { 
-  CheckSquare, Plus, Search, Calendar, Phone, Mail, 
-  Users, MapPin, AlertCircle, Clock, CheckCircle2, Circle
+import {
+  Plus, Phone, Mail,
+  Users, MapPin, Clock, CheckCircle2, Circle, Zap, User
 } from "lucide-react";
 import { toast } from "sonner";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,9 +18,22 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Textarea } from "@/components/ui/textarea";
+
+const taskSchema = z.object({
+  title: z.string().min(3, "Title is required"),
+  description: z.string().optional(),
+  type: z.string().default("call"),
+  priority: z.string().default("medium"),
+  status: z.string().default("pending"),
+  dueDate: z.string().optional(),
+  assignedAgentId: z.coerce.number().optional(),
+});
 
 export default function Tasks() {
   const [filter, setFilter] = useState("all");
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
   const queryClient = useQueryClient();
   const { data: tasks, isLoading } = useListTasks(filter !== "all" ? { status: filter } : undefined);
   const updateTask = useUpdateTask();
@@ -29,7 +45,7 @@ export default function Tasks() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
-          toast.success(`Task marked as \${newStatus}`);
+          toast.success(`Task marked as ${newStatus}`);
         }
       }
     );
@@ -54,30 +70,40 @@ export default function Tasks() {
               <SelectItem value="completed">Completed</SelectItem>
             </SelectContent>
           </Select>
-          <Button className="gap-2">
-            <Plus className="h-4 w-4" /> Add Task
-          </Button>
+
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" /> Add Task
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[500px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Create New Task</DialogTitle>
+              </DialogHeader>
+              <CreateTaskForm onSuccess={() => setIsCreateOpen(false)} />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 flex-1 min-h-0">
-        {/* Kanban Board style */}
-        <TaskColumn 
-          title="Pending" 
-          tasks={tasks?.filter(t => t.status === "pending")} 
-          isLoading={isLoading} 
+        <TaskColumn
+          title="Pending"
+          tasks={(Array.isArray(tasks) ? tasks : []).filter(t => t.status === "pending")}
+          isLoading={isLoading}
           onToggle={handleToggleStatus}
         />
-        <TaskColumn 
-          title="In Progress" 
-          tasks={tasks?.filter(t => t.status === "in-progress")} 
-          isLoading={isLoading} 
+        <TaskColumn
+          title="In Progress"
+          tasks={(Array.isArray(tasks) ? tasks : []).filter(t => t.status === "in-progress")}
+          isLoading={isLoading}
           onToggle={handleToggleStatus}
         />
-        <TaskColumn 
-          title="Completed" 
-          tasks={tasks?.filter(t => t.status === "completed")} 
-          isLoading={isLoading} 
+        <TaskColumn
+          title="Completed"
+          tasks={(Array.isArray(tasks) ? tasks : []).filter(t => t.status === "completed")}
+          isLoading={isLoading}
           onToggle={handleToggleStatus}
         />
       </div>
@@ -103,12 +129,12 @@ function TaskColumn({ title, tasks, isLoading, onToggle }: any) {
             No tasks here
           </div>
         ) : (
-          tasks?.map((task: any) => (
-            <div 
-              key={task.id} 
-              className={`p-4 rounded-lg border bg-card shadow-sm hover:shadow-md transition-shadow relative group \${task.status === 'completed' ? 'opacity-60' : ''}`}
+          (Array.isArray(tasks) ? tasks : []).map((task: any) => (
+            <div
+              key={task.id}
+              className={`p-4 rounded-lg border bg-card shadow-sm hover:shadow-md transition-shadow relative group ${task.status === 'completed' ? 'opacity-60' : ''}`}
             >
-              <button 
+              <button
                 onClick={() => onToggle(task)}
                 className="absolute top-4 right-4 text-muted-foreground hover:text-primary transition-colors"
               >
@@ -118,10 +144,10 @@ function TaskColumn({ title, tasks, isLoading, onToggle }: any) {
                   <Circle className="h-5 w-5" />
                 )}
               </button>
-              
+
               <div className="flex gap-2 mb-2">
                 <Badge variant={
-                  task.priority === 'urgent' ? 'destructive' : 
+                  task.priority === 'urgent' ? 'destructive' :
                   task.priority === 'high' ? 'default' : 'secondary'
                 } className="text-[10px] uppercase px-1.5 py-0">
                   {task.priority}
@@ -133,18 +159,30 @@ function TaskColumn({ title, tasks, isLoading, onToggle }: any) {
                   {task.type === 'viewing' && <MapPin className="h-3 w-3" />}
                   {task.type}
                 </Badge>
+                {task.isAutomated && (
+                  <Badge variant="secondary" className="text-[10px] uppercase px-1.5 py-0 bg-amber-500/10 text-amber-600 border-amber-500/20 flex gap-1 items-center" title={`Created by Workflow: ${task.sourceWorkflowName}`}>
+                    <Zap className="h-3 w-3" /> Auto
+                  </Badge>
+                )}
               </div>
-              
-              <h4 className={`font-medium text-sm leading-snug pr-8 \${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
+
+              {task.leadName && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-1.5 font-medium">
+                  <User className="h-3.5 w-3.5" />
+                  <span>{task.leadName}</span>
+                </div>
+              )}
+
+              <h4 className={`font-medium text-sm leading-snug pr-8 ${task.status === 'completed' ? 'line-through text-muted-foreground' : ''}`}>
                 {task.title}
               </h4>
-              
+
               {task.description && (
                 <p className="text-xs text-muted-foreground mt-2 line-clamp-2">
                   {task.description}
                 </p>
               )}
-              
+
               <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/50">
                 <div className="flex items-center gap-1.5 text-xs text-muted-foreground font-medium">
                   <Clock className="h-3.5 w-3.5" />
@@ -161,5 +199,119 @@ function TaskColumn({ title, tasks, isLoading, onToggle }: any) {
         )}
       </CardContent>
     </Card>
+  );
+}
+
+function CreateTaskForm({ onSuccess }: { onSuccess: () => void }) {
+  const queryClient = useQueryClient();
+  const createTask = useCreateTask();
+  const { data: agents } = useListAgents();
+
+  const form = useForm<z.infer<typeof taskSchema>>({
+    resolver: zodResolver(taskSchema),
+    defaultValues: {
+      title: "", description: "", type: "call",
+      priority: "medium", status: "pending", dueDate: "", assignedAgentId: undefined,
+    },
+  });
+
+  const onSubmit = (data: z.infer<typeof taskSchema>) => {
+    createTask.mutate({ data }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getListTasksQueryKey() });
+        toast.success("Task created successfully!");
+        onSuccess();
+      },
+      onError: (err: any) => {
+        toast.error(err.message || "Failed to create task");
+      },
+    });
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+        <FormField control={form.control} name="title" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Task Title</FormLabel>
+            <FormControl><Input placeholder="e.g. Call back Mr. Johnson about property" {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <FormField control={form.control} name="description" render={({ field }) => (
+          <FormItem>
+            <FormLabel>Description (Optional)</FormLabel>
+            <FormControl><Textarea placeholder="Additional notes..." rows={2} {...field} /></FormControl>
+            <FormMessage />
+          </FormItem>
+        )} />
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField control={form.control} name="type" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Task Type</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                <SelectContent>
+                  <SelectItem value="call">📞 Call</SelectItem>
+                  <SelectItem value="email">📧 Email</SelectItem>
+                  <SelectItem value="meeting">👥 Meeting</SelectItem>
+                  <SelectItem value="viewing">📍 Viewing</SelectItem>
+                  <SelectItem value="other">📋 Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="priority" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Priority</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <FormControl><SelectTrigger><SelectValue /></SelectTrigger></FormControl>
+                <SelectContent>
+                  <SelectItem value="low">🟢 Low</SelectItem>
+                  <SelectItem value="medium">🟡 Medium</SelectItem>
+                  <SelectItem value="high">🟠 High</SelectItem>
+                  <SelectItem value="urgent">🔴 Urgent</SelectItem>
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField control={form.control} name="dueDate" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Due Date (Optional)</FormLabel>
+              <FormControl><Input type="date" {...field} /></FormControl>
+              <FormMessage />
+            </FormItem>
+          )} />
+          <FormField control={form.control} name="assignedAgentId" render={({ field }) => (
+            <FormItem>
+              <FormLabel>Assign To (Optional)</FormLabel>
+              <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
+                <FormControl><SelectTrigger><SelectValue placeholder="Select agent" /></SelectTrigger></FormControl>
+                <SelectContent>
+                  {(Array.isArray(agents) ? agents : []).map(agent => (
+                    <SelectItem key={agent.id} value={agent.id.toString()}>{agent.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FormMessage />
+            </FormItem>
+          )} />
+        </div>
+
+        <div className="flex justify-end gap-3 pt-2 border-t border-border">
+          <Button type="button" variant="outline" onClick={() => { form.reset(); onSuccess(); }}>Cancel</Button>
+          <Button type="submit" disabled={createTask.isPending}>
+            {createTask.isPending ? "Creating..." : "Create Task"}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }

@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { db, notificationsTable } from "@workspace/db";
 import {
   ListNotificationsQueryParams,
@@ -16,12 +16,23 @@ router.get("/notifications", async (req, res): Promise<void> => {
     res.status(400).json({ error: qp.error.message });
     return;
   }
-  let rows = await db.select().from(notificationsTable).orderBy(notificationsTable.createdAt);
+  // Newest-first ordering
+  let rows = await db.select().from(notificationsTable).orderBy(desc(notificationsTable.createdAt));
   if (qp.data.read !== undefined) {
-    const readVal = String(qp.data.read) === "true";
+    // zod.coerce.boolean() coerces any non-empty string to true.
+    // Re-parse the raw query string to get the correct boolean value.
+    const readRaw = req.query["read"];
+    const readVal = readRaw === "true";
     rows = rows.filter((n) => n.isRead === readVal);
   }
   res.json(ListNotificationsResponse.parse(JSON.parse(JSON.stringify(rows))));
+});
+
+// IMPORTANT: /read-all must be registered BEFORE /:id/read to avoid
+// Express matching "read-all" as the :id parameter.
+router.patch("/notifications/read-all", async (req, res): Promise<void> => {
+  await db.update(notificationsTable).set({ isRead: true });
+  res.json({ success: true });
 });
 
 router.patch("/notifications/:id/read", async (req, res): Promise<void> => {
@@ -36,11 +47,6 @@ router.patch("/notifications/:id/read", async (req, res): Promise<void> => {
     return;
   }
   res.json(MarkNotificationReadResponse.parse(JSON.parse(JSON.stringify(notif))));
-});
-
-router.patch("/notifications/read-all", async (req, res): Promise<void> => {
-  await db.update(notificationsTable).set({ isRead: true });
-  res.json({ success: true });
 });
 
 export default router;

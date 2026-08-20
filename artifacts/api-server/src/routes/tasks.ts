@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, tasksTable, agentsTable } from "@workspace/db";
+import { eq, sql, desc } from "drizzle-orm";
+import { db, tasksTable, agentsTable, leadsTable } from "@workspace/db";
+import { automationEngine } from "../engine/automationEngine";
 import {
   ListTasksQueryParams,
   ListTasksResponse,
@@ -28,7 +29,11 @@ const withAgent = {
   assignedAgentId: tasksTable.assignedAgentId,
   assignedAgentName: agentsTable.name,
   leadId: tasksTable.leadId,
+  leadName: sql<string>`trim(concat(${leadsTable.firstName}, ' ', coalesce(${leadsTable.lastName}, '')))`,
   clientId: tasksTable.clientId,
+  sourceWorkflowId: tasksTable.sourceWorkflowId,
+  sourceWorkflowName: tasksTable.sourceWorkflowName,
+  isAutomated: tasksTable.isAutomated,
   createdAt: tasksTable.createdAt,
 };
 
@@ -42,12 +47,13 @@ router.get("/tasks", async (req, res): Promise<void> => {
     .select(withAgent)
     .from(tasksTable)
     .leftJoin(agentsTable, eq(tasksTable.assignedAgentId, agentsTable.id))
-    .orderBy(tasksTable.createdAt);
+    .leftJoin(leadsTable, eq(tasksTable.leadId, leadsTable.id))
+    .orderBy(desc(tasksTable.createdAt));
   if (qp.data.status) rows = rows.filter((t) => t.status === qp.data.status);
   if (qp.data.type) rows = rows.filter((t) => t.type === qp.data.type);
   if (qp.data.assignedAgentId != null) rows = rows.filter((t) => t.assignedAgentId === qp.data.assignedAgentId);
   if (qp.data.dueDate) rows = rows.filter((t) => t.dueDate === qp.data.dueDate);
-  res.json(ListTasksResponse.parse(rows));
+  res.json(ListTasksResponse.parse(JSON.parse(JSON.stringify(rows))));
 });
 
 router.post("/tasks", async (req, res): Promise<void> => {
@@ -57,8 +63,8 @@ router.post("/tasks", async (req, res): Promise<void> => {
     return;
   }
   const [task] = await db.insert(tasksTable).values(parsed.data).returning();
-  const row = await db.select(withAgent).from(tasksTable).leftJoin(agentsTable, eq(tasksTable.assignedAgentId, agentsTable.id)).where(eq(tasksTable.id, task.id));
-  res.status(201).json(CreateTaskResponse.parse(row[0]));
+  const row = await db.select(withAgent).from(tasksTable).leftJoin(agentsTable, eq(tasksTable.assignedAgentId, agentsTable.id)).leftJoin(leadsTable, eq(tasksTable.leadId, leadsTable.id)).where(eq(tasksTable.id, task.id));
+  res.status(201).json(CreateTaskResponse.parse(JSON.parse(JSON.stringify(row[0]))));
 });
 
 router.get("/tasks/:id", async (req, res): Promise<void> => {
@@ -67,12 +73,12 @@ router.get("/tasks/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const rows = await db.select(withAgent).from(tasksTable).leftJoin(agentsTable, eq(tasksTable.assignedAgentId, agentsTable.id)).where(eq(tasksTable.id, params.data.id));
+  const rows = await db.select(withAgent).from(tasksTable).leftJoin(agentsTable, eq(tasksTable.assignedAgentId, agentsTable.id)).leftJoin(leadsTable, eq(tasksTable.leadId, leadsTable.id)).where(eq(tasksTable.id, params.data.id));
   if (!rows[0]) {
     res.status(404).json({ error: "Task not found" });
     return;
   }
-  res.json(GetTaskResponse.parse(rows[0]));
+  res.json(GetTaskResponse.parse(JSON.parse(JSON.stringify(rows[0]))));
 });
 
 router.patch("/tasks/:id", async (req, res): Promise<void> => {
@@ -86,13 +92,36 @@ router.patch("/tasks/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [updated] = await db.update(tasksTable).set(parsed.data).where(eq(tasksTable.id, params.data.id)).returning();
-  if (!updated) {
+  const [existing] = await db.select().from(tasksTable).where(eq(tasksTable.id, params.data.id));
+  if (!existing) {
     res.status(404).json({ error: "Task not found" });
     return;
   }
-  const row = await db.select(withAgent).from(tasksTable).leftJoin(agentsTable, eq(tasksTable.assignedAgentId, agentsTable.id)).where(eq(tasksTable.id, updated.id));
-  res.json(UpdateTaskResponse.parse(row[0]));
+
+  const [updated] = await db.update(tasksTable).set(parsed.data).where(eq(tasksTable.id, params.data.id)).returning();
+
+  // Trigger Automation Engine
+  const isNewlyCompleted = existing.status !== "completed" && updated.status === "completed";
+  const eventName = isNewlyCompleted ? "TASK_COMPLETED" : "TASK_UPDATED";
+  await automationEngine.triggerEvent(eventName, {
+    entityType: "task",
+    entityId: updated.id,
+    entityName: updated.title,
+    data: {
+      id: updated.id,
+      title: updated.title,
+      type: updated.type,
+      status: updated.status,
+      priority: updated.priority,
+      leadId: updated.leadId,
+      assignedAgentId: updated.assignedAgentId,
+      sourceWorkflowId: updated.sourceWorkflowId,
+      isAutomated: updated.isAutomated,
+    },
+  });
+
+  const rows = await db.select(withAgent).from(tasksTable).leftJoin(agentsTable, eq(tasksTable.assignedAgentId, agentsTable.id)).leftJoin(leadsTable, eq(tasksTable.leadId, leadsTable.id)).where(eq(tasksTable.id, params.data.id));
+  res.json(UpdateTaskResponse.parse(JSON.parse(JSON.stringify(rows[0]))));
 });
 
 router.delete("/tasks/:id", async (req, res): Promise<void> => {

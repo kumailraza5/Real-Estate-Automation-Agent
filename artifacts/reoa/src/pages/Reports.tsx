@@ -32,7 +32,7 @@ export default function Reports() {
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-muted-foreground">Total Automations Run</p>
-                    <p className="text-3xl font-display font-bold">{report?.totalExecutions.toLocaleString()}</p>
+                    <p className="text-3xl font-display font-bold">{(report?.totalExecutions ?? 0).toLocaleString()}</p>
                   </div>
                   <div className="p-3 bg-primary/10 text-primary rounded-lg"><Activity className="h-5 w-5" /></div>
                 </div>
@@ -43,7 +43,7 @@ export default function Reports() {
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-muted-foreground">Success Rate</p>
-                    <p className="text-3xl font-display font-bold text-green-600">{report?.successRate}%</p>
+                    <p className="text-3xl font-display font-bold text-green-600">{report?.successRate ?? 100}%</p>
                   </div>
                   <div className="p-3 bg-green-500/10 text-green-600 rounded-lg"><CheckCircle2 className="h-5 w-5" /></div>
                 </div>
@@ -54,7 +54,7 @@ export default function Reports() {
                 <div className="flex justify-between items-start">
                   <div className="space-y-1">
                     <p className="text-sm font-medium text-muted-foreground">Active Triggers</p>
-                    <p className="text-3xl font-display font-bold">{report?.byTrigger.length}</p>
+                    <p className="text-3xl font-display font-bold">{(report?.byTrigger ?? []).length}</p>
                   </div>
                   <div className="p-3 bg-accent/10 text-accent rounded-lg"><Zap className="h-5 w-5" /></div>
                 </div>
@@ -71,7 +71,7 @@ export default function Reports() {
               <CardContent>
                 <div className="h-[300px] w-full mt-4">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={report?.byWorkflow} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
+                    <BarChart data={Array.isArray(report?.byWorkflow) ? report.byWorkflow : []} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" />
                       <XAxis dataKey="workflowName" axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12 }} />
@@ -80,8 +80,8 @@ export default function Reports() {
                         contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', background: 'hsl(var(--card))' }}
                       />
                       <Bar dataKey="executions" radius={[4, 4, 0, 0]}>
-                        {report?.byWorkflow.map((entry, index) => (
-                          <Cell key={`cell-\${index}`} fill="hsl(var(--primary))" />
+                        {(Array.isArray(report?.byWorkflow) ? report.byWorkflow : []).map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill="hsl(var(--primary))" />
                         ))}
                       </Bar>
                     </BarChart>
@@ -104,10 +104,10 @@ export default function Reports() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {report?.byTrigger.map((trigger) => (
+                    {(Array.isArray(report?.byTrigger) ? report.byTrigger : []).map((trigger) => (
                       <TableRow key={trigger.trigger}>
                         <TableCell className="font-medium font-mono text-sm">{trigger.trigger}</TableCell>
-                        <TableCell className="text-right">{trigger.count.toLocaleString()}</TableCell>
+                        <TableCell className="text-right">{(trigger.count ?? 0).toLocaleString()}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>

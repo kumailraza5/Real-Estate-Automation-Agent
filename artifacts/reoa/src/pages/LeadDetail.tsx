@@ -27,12 +27,32 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
+import { PROPERTY_TYPES } from "@/lib/constants";
 import { LeadStatusBadge } from "./Leads";
+
+const leadSchema = z.object({
+  firstName: z.string().min(2),
+  lastName: z.string().min(2),
+  email: z.string().email(),
+  phone: z.string().optional(),
+  source: z.string().min(2),
+  status: z.string(),
+  assignedAgentId: z.coerce.number().optional(),
+  budget: z.coerce.number().optional(),
+  propertyType: z.string().optional(),
+});
 
 export default function LeadDetail() {
   const { id } = useParams<{ id: string }>();
   const leadId = parseInt(id || "0", 10);
   const queryClient = useQueryClient();
+  const [isEditOpen, setIsEditOpen] = useState(false);
   
   const { data: lead, isLoading: loadingLead } = useGetLead(leadId, { 
     query: { enabled: !!leadId, queryKey: getGetLeadQueryKey(leadId) } 
@@ -74,6 +94,25 @@ export default function LeadDetail() {
     );
   };
 
+  const [isConverting, setIsConverting] = useState(false);
+  const handleConvert = async () => {
+    if (lead?.status === "converted") return;
+    setIsConverting(true);
+    try {
+      const res = await fetch(`/api/leads/${leadId}/convert`, { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to convert lead");
+      
+      toast.success("Lead successfully converted to Client");
+      queryClient.invalidateQueries({ queryKey: getGetLeadQueryKey(leadId) });
+      queryClient.invalidateQueries({ queryKey: getGetLeadActivityQueryKey(leadId) });
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setIsConverting(false);
+    }
+  };
+
   if (loadingLead) {
     return (
       <div className="space-y-6 max-w-7xl mx-auto">
@@ -99,6 +138,15 @@ export default function LeadDetail() {
         <ArrowLeft className="h-4 w-4" />
         <Link href="/leads">Back to Leads</Link>
       </div>
+
+      {lead.clientId && (
+        <div className="bg-primary/10 border border-primary/20 rounded-md p-4 mb-6 flex items-center justify-between">
+          <p className="text-sm font-medium">This lead has been converted to a client.</p>
+          <Link href={`/clients/${lead.clientId}`} className="text-sm font-bold text-primary hover:underline">
+            View Client Record →
+          </Link>
+        </div>
+      )}
       
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
@@ -125,12 +173,31 @@ export default function LeadDetail() {
               <SelectItem value="proposal">Proposal</SelectItem>
               <SelectItem value="negotiation">Negotiation</SelectItem>
               <SelectItem value="closed">Closed</SelectItem>
+              <SelectItem value="converted">Converted</SelectItem>
               <SelectItem value="lost">Lost</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" className="gap-2">
-            <Edit className="h-4 w-4" /> Edit Profile
+          <Button 
+            variant="default" 
+            onClick={handleConvert} 
+            disabled={isConverting || lead.status === "converted"}
+            className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white"
+          >
+            {lead.status === "converted" ? "Converted" : "Convert to Client"}
           </Button>
+          <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2">
+                <Edit className="h-4 w-4" /> Edit Profile
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-[560px] max-h-[90vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle>Edit Profile</DialogTitle>
+              </DialogHeader>
+              <EditLeadForm lead={lead} onSuccess={() => setIsEditOpen(false)} />
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -182,7 +249,7 @@ export default function LeadDetail() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned" disabled>Unassigned</SelectItem>
-                      {agents?.map(agent => (
+                      {(Array.isArray(agents) ? agents : []).map(agent => (
                         <SelectItem key={agent.id} value={agent.id.toString()}>{agent.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -221,7 +288,7 @@ export default function LeadDetail() {
                     <div className="text-center py-8 text-muted-foreground">No activity recorded yet.</div>
                   ) : (
                     <div className="space-y-6 border-l-2 border-muted ml-3 pl-4 pt-2 pb-2">
-                      {activity?.map(log => (
+                      {(Array.isArray(activity) ? activity : []).map(log => (
                         <div key={log.id} className="relative">
                           <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-card border-2 border-accent" />
                           <div className="bg-muted/20 rounded-lg p-3 border border-border">
@@ -310,7 +377,7 @@ function NotesSection({ leadId, notes, loading }: { leadId: number, notes: any, 
             No notes yet. Add one above.
           </div>
         ) : (
-          notes?.map((note: any) => (
+          (Array.isArray(notes) ? notes : []).map((note: any) => (
             <Card key={note.id} className="shadow-none bg-muted/5 border-border">
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-2">
@@ -333,5 +400,206 @@ function NotesSection({ leadId, notes, loading }: { leadId: number, notes: any, 
         )}
       </div>
     </div>
+  );
+}
+
+function EditLeadForm({ lead, onSuccess }: { lead: any; onSuccess: () => void }) {
+  const queryClient = useQueryClient();
+  const updateLead = useUpdateLead();
+  const { data: agents } = useListAgents();
+  
+  const form = useForm<z.infer<typeof leadSchema>>({
+    resolver: zodResolver(leadSchema),
+    defaultValues: {
+      firstName: lead.firstName || "",
+      lastName: lead.lastName || "",
+      email: lead.email || "",
+      phone: lead.phone || "",
+      source: lead.source || "website",
+      status: lead.status || "new",
+      budget: lead.budget || undefined,
+      propertyType: lead.propertyType || "",
+      assignedAgentId: lead.assignedAgentId || undefined,
+    },
+  });
+
+  const onSubmit = (data: z.infer<typeof leadSchema>) => {
+    updateLead.mutate({ id: lead.id, data }, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: getGetLeadQueryKey(lead.id) });
+        queryClient.invalidateQueries({ queryKey: getGetLeadActivityQueryKey(lead.id) });
+        toast.success("Profile updated successfully");
+        onSuccess();
+      },
+      onError: (err: any) => {
+        toast.error(err.message || "Failed to update profile");
+      }
+    });
+  };
+
+  return (
+    <Form {...form}>
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pt-2">
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="firstName"
+            render={({ field }) => (
+               <FormItem>
+                 <FormLabel>First Name</FormLabel>
+                 <FormControl>
+                   <Input {...field} />
+                 </FormControl>
+                 <FormMessage />
+               </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="lastName"
+            render={({ field }) => (
+               <FormItem>
+                 <FormLabel>Last Name</FormLabel>
+                 <FormControl>
+                   <Input {...field} />
+                 </FormControl>
+                 <FormMessage />
+               </FormItem>
+            )}
+          />
+        </div>
+        
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="email"
+            render={({ field }) => (
+               <FormItem>
+                 <FormLabel>Email</FormLabel>
+                 <FormControl>
+                   <Input type="email" {...field} />
+                 </FormControl>
+                 <FormMessage />
+               </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="phone"
+            render={({ field }) => (
+               <FormItem>
+                 <FormLabel>Phone (Optional)</FormLabel>
+                 <FormControl>
+                   <Input {...field} />
+                 </FormControl>
+                 <FormMessage />
+               </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="source"
+            render={({ field }) => (
+               <FormItem>
+                 <FormLabel>Source</FormLabel>
+                 <Select onValueChange={field.onChange} defaultValue={field.value}>
+                   <FormControl>
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select source" />
+                     </SelectTrigger>
+                   </FormControl>
+                   <SelectContent>
+                     <SelectItem value="website">Website</SelectItem>
+                     <SelectItem value="referral">Referral</SelectItem>
+                     <SelectItem value="social">Social Media</SelectItem>
+                     <SelectItem value="walk-in">Walk-in</SelectItem>
+                     <SelectItem value="zillow">Zillow</SelectItem>
+                   </SelectContent>
+                 </Select>
+                 <FormMessage />
+               </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="propertyType"
+            render={({ field }) => (
+               <FormItem>
+                 <FormLabel>Interest (Optional)</FormLabel>
+                 <Select onValueChange={field.onChange} defaultValue={field.value}>
+                   <FormControl>
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select type" />
+                     </SelectTrigger>
+                   </FormControl>
+                   <SelectContent>
+                     {PROPERTY_TYPES.map((t) => (
+                       <SelectItem key={t.value} value={t.value}>
+                         {t.label}
+                       </SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+                 <FormMessage />
+               </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <FormField
+            control={form.control}
+            name="budget"
+            render={({ field }) => (
+               <FormItem>
+                 <FormLabel>Budget (Optional)</FormLabel>
+                 <FormControl>
+                   <Input
+                     type="number"
+                     placeholder="e.g. 750000"
+                     {...field}
+                     onChange={e => field.onChange(e.target.value === '' ? undefined : Number(e.target.value))}
+                     value={field.value ?? ''}
+                   />
+                 </FormControl>
+                 <FormMessage />
+               </FormItem>
+            )}
+          />
+          <FormField
+            control={form.control}
+            name="assignedAgentId"
+            render={({ field }) => (
+               <FormItem>
+                 <FormLabel>Assign To (Optional)</FormLabel>
+                 <Select onValueChange={field.onChange} defaultValue={field.value?.toString()}>
+                   <FormControl>
+                     <SelectTrigger>
+                       <SelectValue placeholder="Select an agent" />
+                     </SelectTrigger>
+                   </FormControl>
+                   <SelectContent>
+                     {(Array.isArray(agents) ? agents : []).map(agent => (
+                       <SelectItem key={agent.id} value={agent.id.toString()}>{agent.name}</SelectItem>
+                     ))}
+                   </SelectContent>
+                 </Select>
+                 <FormMessage />
+               </FormItem>
+            )}
+          />
+        </div>
+
+        <div className="flex justify-end gap-3 pt-4 border-t border-border mt-6">
+          <Button type="button" variant="outline" onClick={onSuccess}>Cancel</Button>
+          <Button type="submit" disabled={updateLead.isPending}>
+            {updateLead.isPending ? "Saving..." : "Save Changes"}
+          </Button>
+        </div>
+      </form>
+    </Form>
   );
 }

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { db, propertiesTable, agentsTable } from "@workspace/db";
+import { eq, desc } from "drizzle-orm";
+import { db, propertiesTable, agentsTable, appointmentsTable } from "@workspace/db";
+import { automationEngine } from "../engine/automationEngine";
 import {
   ListPropertiesQueryParams,
   ListPropertiesResponse,
@@ -34,6 +35,19 @@ const withAgent = {
   createdAt: propertiesTable.createdAt,
 };
 
+const formatProperty = (p: any) =>
+  p
+    ? JSON.parse(
+        JSON.stringify({
+          ...p,
+          price: p.price != null ? Number(p.price) : 0,
+          area: p.area != null ? Number(p.area) : 0,
+          bedrooms: p.bedrooms != null ? Number(p.bedrooms) : 0,
+          bathrooms: p.bathrooms != null ? Number(p.bathrooms) : 0,
+        })
+      )
+    : p;
+
 router.get("/properties", async (req, res): Promise<void> => {
   const qp = ListPropertiesQueryParams.safeParse(req.query);
   if (!qp.success) {
@@ -44,10 +58,10 @@ router.get("/properties", async (req, res): Promise<void> => {
     .select(withAgent)
     .from(propertiesTable)
     .leftJoin(agentsTable, eq(propertiesTable.assignedAgentId, agentsTable.id))
-    .orderBy(propertiesTable.createdAt);
+    .orderBy(desc(propertiesTable.createdAt));
   if (qp.data.status) rows = rows.filter((p) => p.status === qp.data.status);
   if (qp.data.type) rows = rows.filter((p) => p.type === qp.data.type);
-  res.json(ListPropertiesResponse.parse(rows));
+  res.json(ListPropertiesResponse.parse(rows.map(formatProperty)));
 });
 
 router.post("/properties", async (req, res): Promise<void> => {
@@ -56,9 +70,31 @@ router.post("/properties", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [prop] = await db.insert(propertiesTable).values(parsed.data).returning();
+  const insertData = {
+    ...parsed.data,
+    price: String(parsed.data.price),
+    area: String(parsed.data.area),
+  };
+  const [prop] = await db.insert(propertiesTable).values(insertData).returning();
+
+  // Trigger Automation Engine
+  await automationEngine.triggerEvent("PROPERTY_LISTED", {
+    entityType: "property",
+    entityId: prop.id,
+    entityName: prop.title,
+    data: {
+      id: prop.id,
+      title: prop.title,
+      type: prop.type,
+      status: prop.status,
+      price: Number(prop.price || 0),
+      city: prop.city,
+      assignedAgentId: prop.assignedAgentId,
+    },
+  });
+
   const row = await db.select(withAgent).from(propertiesTable).leftJoin(agentsTable, eq(propertiesTable.assignedAgentId, agentsTable.id)).where(eq(propertiesTable.id, prop.id));
-  res.status(201).json(CreatePropertyResponse.parse(row[0]));
+  res.status(201).json(CreatePropertyResponse.parse(formatProperty(row[0])));
 });
 
 router.get("/properties/:id", async (req, res): Promise<void> => {
@@ -72,7 +108,7 @@ router.get("/properties/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Property not found" });
     return;
   }
-  res.json(GetPropertyResponse.parse(rows[0]));
+  res.json(GetPropertyResponse.parse(formatProperty(rows[0])));
 });
 
 router.patch("/properties/:id", async (req, res): Promise<void> => {
@@ -86,13 +122,65 @@ router.patch("/properties/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const [updated] = await db.update(propertiesTable).set(parsed.data).where(eq(propertiesTable.id, params.data.id)).returning();
+
+  // Fetch existing record BEFORE updating so we can detect state transitions
+  const [existing] = await db
+    .select()
+    .from(propertiesTable)
+    .where(eq(propertiesTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "Property not found" });
+    return;
+  }
+
+  const updateData = {
+    ...parsed.data,
+    price: parsed.data.price != null ? String(parsed.data.price) : undefined,
+    area: parsed.data.area != null ? String(parsed.data.area) : undefined,
+  };
+  const [updated] = await db.update(propertiesTable).set(updateData).where(eq(propertiesTable.id, params.data.id)).returning();
   if (!updated) {
     res.status(404).json({ error: "Property not found" });
     return;
   }
+
+  // Determine event based on actual status transition:
+  // PROPERTY_SOLD fires ONLY when transitioning FROM non-sold INTO sold.
+  // All other edits (including edits on already-sold properties) fire PROPERTY_UPDATED.
+  const transitionedToSold = existing.status !== "sold" && updated.status === "sold";
+  const eventName = transitionedToSold ? "PROPERTY_SOLD" : "PROPERTY_UPDATED";
+
+  const eventData = {
+    id: updated.id,
+    title: updated.title,
+    type: updated.type,
+    status: updated.status,
+    price: Number(updated.price || 0),
+    city: updated.city,
+    assignedAgentId: updated.assignedAgentId,
+  };
+
+  const previousData = {
+    id: existing.id,
+    title: existing.title,
+    type: existing.type,
+    status: existing.status,
+    price: Number(existing.price || 0),
+    city: existing.city,
+    assignedAgentId: existing.assignedAgentId,
+  };
+
+  // Trigger Automation Engine with previousData so state-transition guard works
+  await automationEngine.triggerEvent(eventName, {
+    entityType: "property",
+    entityId: updated.id,
+    entityName: updated.title,
+    data: eventData,
+    previousData,
+  });
+
   const row = await db.select(withAgent).from(propertiesTable).leftJoin(agentsTable, eq(propertiesTable.assignedAgentId, agentsTable.id)).where(eq(propertiesTable.id, updated.id));
-  res.json(UpdatePropertyResponse.parse(row[0]));
+  res.json(UpdatePropertyResponse.parse(formatProperty(row[0])));
 });
 
 router.delete("/properties/:id", async (req, res): Promise<void> => {
@@ -101,7 +189,12 @@ router.delete("/properties/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: params.error.message });
     return;
   }
-  const [prop] = await db.delete(propertiesTable).where(eq(propertiesTable.id, params.data.id)).returning();
+  const propertyId = params.data.id;
+
+  // Delete associated appointments to avoid foreign key constraints
+  await db.delete(appointmentsTable).where(eq(appointmentsTable.propertyId, propertyId));
+
+  const [prop] = await db.delete(propertiesTable).where(eq(propertiesTable.id, propertyId)).returning();
   if (!prop) {
     res.status(404).json({ error: "Property not found" });
     return;

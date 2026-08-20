@@ -22,7 +22,10 @@ export const workflowExecutionsTable = pgTable("workflow_executions", {
   status: text("status").notNull().default("success"), // success | failed | partial
   triggeredBy: text("triggered_by").notNull(),
   triggerEntityId: integer("trigger_entity_id"),
+  triggerEntityType: text("trigger_entity_type"), // lead | property | client | appointment | task
+  triggerEntityName: text("trigger_entity_name"), // e.g. "Bruce Wayne"
   actionsExecuted: integer("actions_executed").notNull().default(0),
+  actionResults: text("action_results"), // JSON array of per-action outcomes
   errorMessage: text("error_message"),
   executedAt: timestamp("executed_at", { withTimezone: true }).notNull().defaultNow(),
 });

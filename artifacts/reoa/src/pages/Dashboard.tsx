@@ -85,7 +85,7 @@ export default function Dashboard() {
               </div>
             ) : (
               <div className="space-y-4">
-                {pipeline?.stages.map((stage) => (
+                {(pipeline?.stages ?? []).map((stage) => (
                   <div key={stage.status} className="flex items-center gap-4">
                     <div className="w-32 text-sm font-medium capitalize text-muted-foreground">
                       {stage.status.replace('_', ' ')}
@@ -93,7 +93,7 @@ export default function Dashboard() {
                     <div className="flex-1 h-3 bg-muted rounded-full overflow-hidden">
                       <div 
                         className="h-full bg-accent transition-all duration-500"
-                        style={{ width: `${Math.max(5, (stage.value / (pipeline.stages.reduce((a, b) => a + b.value, 0) || 1)) * 100)}%` }}
+                        style={{ width: `${Math.max(5, (stage.value / ((pipeline?.stages ?? []).reduce((a, b) => a + b.value, 0) || 1)) * 100)}%` }}
                       />
                     </div>
                     <div className="w-24 text-right text-sm font-semibold">
@@ -120,14 +120,14 @@ export default function Dashboard() {
                 <Skeleton className="h-12 w-full" />
                 <Skeleton className="h-12 w-full" />
               </div>
-            ) : tasks?.length === 0 ? (
+            ) : !Array.isArray(tasks) || tasks.length === 0 ? (
               <div className="py-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-2">
                 <CheckSquare className="h-8 w-8 text-muted" />
                 <p>No tasks scheduled for today.</p>
               </div>
             ) : (
               <div className="space-y-3">
-                {tasks?.slice(0, 5).map(task => (
+                {tasks.slice(0, 5).map(task => (
                   <div key={task.id} className="flex items-start gap-3 p-3 rounded-lg border border-border hover:border-accent/50 transition-colors">
                     {task.type === 'call' ? <Phone className="h-4 w-4 mt-0.5 text-blue-500" /> :
                      task.type === 'email' ? <Mail className="h-4 w-4 mt-0.5 text-orange-500" /> :
@@ -136,7 +136,11 @@ export default function Dashboard() {
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{task.title}</p>
                       <p className="text-xs text-muted-foreground capitalize">
-                        {task.dueTime ? format(new Date(`2000-01-01T\${task.dueTime}`), 'h:mm a') : 'Any time'}
+                        {task.dueTime 
+                          ? (task.dueTime.toLowerCase().includes('m') 
+                              ? task.dueTime 
+                              : format(new Date(`2000-01-01T${task.dueTime}`), 'h:mm a')) 
+                          : 'Any time'}
                       </p>
                     </div>
                     {task.priority === 'urgent' && <Badge variant="destructive" className="text-[10px] px-1 py-0 h-4">Urgent</Badge>}
@@ -164,7 +168,7 @@ export default function Dashboard() {
             ) : (
               <div className="space-y-4 relative before:absolute before:inset-0 before:ml-2 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:h-full before:w-0.5 before:bg-gradient-to-b before:from-transparent before:via-muted before:to-transparent hidden">
                 <div className="space-y-6">
-                  {activity?.map(log => (
+                  {(Array.isArray(activity) ? activity : []).map(log => (
                     <div key={log.id} className="flex gap-4 items-start">
                       <div className="relative mt-1">
                         <div className="absolute -inset-1 rounded-full bg-accent/20 blur-[2px]" />
@@ -187,7 +191,7 @@ export default function Dashboard() {
             {/* Real timeline view */}
             {!loadingActivity && (
               <div className="space-y-6 border-l-2 border-muted ml-3 pl-4">
-                {activity?.map(log => (
+                {(Array.isArray(activity) ? activity : []).map(log => (
                   <div key={log.id} className="relative">
                     <div className="absolute -left-[21px] top-1 h-2.5 w-2.5 rounded-full bg-card border-2 border-accent" />
                     <div>

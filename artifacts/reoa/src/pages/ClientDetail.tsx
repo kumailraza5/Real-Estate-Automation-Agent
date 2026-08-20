@@ -108,9 +108,16 @@ export default function ClientDetail() {
             </h1>
             <ClientStatusBadge status={client.status} />
           </div>
-          <p className="text-muted-foreground mt-1 flex items-center gap-2">
-            Client added on {format(new Date(client.createdAt), "MMMM d, yyyy")}
-          </p>
+          <div className="flex flex-col gap-1 mt-1 text-sm">
+            <p className="text-muted-foreground flex items-center gap-2">
+              Client added on {format(new Date(client.createdAt), "MMMM d, yyyy")}
+            </p>
+            {client.leadId && (
+              <p className="text-muted-foreground flex items-center gap-2">
+                Originating Lead: <Link href={`/leads/${client.leadId}`} className="text-primary hover:underline font-medium">View Lead #{client.leadId}</Link>
+              </p>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
@@ -174,7 +181,7 @@ export default function ClientDetail() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="unassigned" disabled>Unassigned</SelectItem>
-                      {agents?.map(agent => (
+                      {(Array.isArray(agents) ? agents : []).map(agent => (
                         <SelectItem key={agent.id} value={agent.id.toString()}>{agent.name}</SelectItem>
                       ))}
                     </SelectContent>
@@ -213,7 +220,7 @@ export default function ClientDetail() {
                     <div className="text-center py-8 text-muted-foreground">No activity recorded yet.</div>
                   ) : (
                     <div className="space-y-6 border-l-2 border-muted ml-3 pl-4 pt-2 pb-2">
-                      {activity?.map(log => (
+                      {(Array.isArray(activity) ? activity : []).map(log => (
                         <div key={log.id} className="relative">
                           <div className="absolute -left-[21px] top-1.5 h-2.5 w-2.5 rounded-full bg-card border-2 border-primary" />
                           <div className="bg-muted/20 rounded-lg p-3 border border-border">
@@ -302,7 +309,7 @@ function NotesSection({ clientId, notes, loading }: { clientId: number, notes: a
             No notes yet. Add one above.
           </div>
         ) : (
-          notes?.map((note: any) => (
+          (Array.isArray(notes) ? notes : []).map((note: any) => (
             <Card key={note.id} className="shadow-none bg-muted/5 border-border">
               <CardContent className="p-4">
                 <div className="flex justify-between items-start mb-2">

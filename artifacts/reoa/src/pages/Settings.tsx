@@ -165,7 +165,7 @@ function TeamSettings() {
                 </TableCell>
               </TableRow>
             ) : (
-              agents?.map(agent => (
+              (Array.isArray(agents) ? agents : []).map(agent => (
                 <TableRow key={agent.id}>
                   <TableCell>
                     <div className="flex items-center gap-3">

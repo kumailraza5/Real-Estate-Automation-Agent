@@ -17,7 +17,7 @@ const router: IRouter = Router();
 
 router.get("/agents", async (req, res): Promise<void> => {
   const agents = await db.select().from(agentsTable).orderBy(agentsTable.createdAt);
-  res.json(ListAgentsResponse.parse(agents));
+  res.json(ListAgentsResponse.parse(JSON.parse(JSON.stringify(agents))));
 });
 
 router.post("/agents", async (req, res): Promise<void> => {
@@ -27,7 +27,7 @@ router.post("/agents", async (req, res): Promise<void> => {
     return;
   }
   const [agent] = await db.insert(agentsTable).values(parsed.data).returning();
-  res.status(201).json(CreateAgentResponse.parse(agent));
+  res.status(201).json(CreateAgentResponse.parse(JSON.parse(JSON.stringify(agent))));
 });
 
 router.get("/agents/:id", async (req, res): Promise<void> => {
@@ -41,7 +41,7 @@ router.get("/agents/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Agent not found" });
     return;
   }
-  res.json(GetAgentResponse.parse(agent));
+  res.json(GetAgentResponse.parse(JSON.parse(JSON.stringify(agent))));
 });
 
 router.patch("/agents/:id", async (req, res): Promise<void> => {
@@ -60,7 +60,7 @@ router.patch("/agents/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Agent not found" });
     return;
   }
-  res.json(UpdateAgentResponse.parse(agent));
+  res.json(UpdateAgentResponse.parse(JSON.parse(JSON.stringify(agent))));
 });
 
 router.delete("/agents/:id", async (req, res): Promise<void> => {

@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq } from "drizzle-orm";
 import { db, appointmentsTable, agentsTable } from "@workspace/db";
+import { automationEngine } from "../engine/automationEngine";
 import {
   ListAppointmentsQueryParams,
   ListAppointmentsResponse,
@@ -45,7 +46,7 @@ router.get("/appointments", async (req, res): Promise<void> => {
     .leftJoin(agentsTable, eq(appointmentsTable.assignedAgentId, agentsTable.id))
     .orderBy(appointmentsTable.startTime);
   if (qp.data.type) rows = rows.filter((a) => a.type === qp.data.type);
-  res.json(ListAppointmentsResponse.parse(rows));
+  res.json(ListAppointmentsResponse.parse(JSON.parse(JSON.stringify(rows))));
 });
 
 router.post("/appointments", async (req, res): Promise<void> => {
@@ -60,8 +61,26 @@ router.post("/appointments", async (req, res): Promise<void> => {
     endTime: new Date(parsed.data.endTime),
   };
   const [appt] = await db.insert(appointmentsTable).values(data).returning();
+
+  // Trigger Automation Engine
+  await automationEngine.triggerEvent("VIEWING_SCHEDULED", {
+    entityType: "appointment",
+    entityId: appt.id,
+    entityName: appt.title,
+    data: {
+      id: appt.id,
+      title: appt.title,
+      type: appt.type,
+      status: appt.status,
+      leadId: appt.leadId,
+      clientId: appt.clientId,
+      propertyId: appt.propertyId,
+      assignedAgentId: appt.assignedAgentId,
+    },
+  });
+
   const row = await db.select(withAgent).from(appointmentsTable).leftJoin(agentsTable, eq(appointmentsTable.assignedAgentId, agentsTable.id)).where(eq(appointmentsTable.id, appt.id));
-  res.status(201).json(CreateAppointmentResponse.parse(row[0]));
+  res.status(201).json(CreateAppointmentResponse.parse(JSON.parse(JSON.stringify(row[0]))));
 });
 
 router.get("/appointments/:id", async (req, res): Promise<void> => {
@@ -75,7 +94,7 @@ router.get("/appointments/:id", async (req, res): Promise<void> => {
     res.status(404).json({ error: "Appointment not found" });
     return;
   }
-  res.json(GetAppointmentResponse.parse(rows[0]));
+  res.json(GetAppointmentResponse.parse(JSON.parse(JSON.stringify(rows[0]))));
 });
 
 router.patch("/appointments/:id", async (req, res): Promise<void> => {
@@ -89,16 +108,51 @@ router.patch("/appointments/:id", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
+
+  const [existing] = await db.select().from(appointmentsTable).where(eq(appointmentsTable.id, params.data.id));
+  if (!existing) {
+    res.status(404).json({ error: "Appointment not found" });
+    return;
+  }
+
   const setData: Record<string, unknown> = { ...parsed.data };
   if (parsed.data.startTime) setData.startTime = new Date(parsed.data.startTime);
   if (parsed.data.endTime) setData.endTime = new Date(parsed.data.endTime);
   const [updated] = await db.update(appointmentsTable).set(setData).where(eq(appointmentsTable.id, params.data.id)).returning();
-  if (!updated) {
-    res.status(404).json({ error: "Appointment not found" });
-    return;
-  }
+
+  const eventData = {
+    id: updated.id,
+    title: updated.title,
+    type: updated.type,
+    status: updated.status,
+    leadId: updated.leadId,
+    clientId: updated.clientId,
+    propertyId: updated.propertyId,
+    assignedAgentId: updated.assignedAgentId,
+  };
+
+  const previousData = {
+    id: existing.id,
+    title: existing.title,
+    type: existing.type,
+    status: existing.status,
+    leadId: existing.leadId,
+    clientId: existing.clientId,
+    propertyId: existing.propertyId,
+    assignedAgentId: existing.assignedAgentId,
+  };
+
+  // Trigger Automation Engine
+  const eventName = (updated.status === "completed" && existing.status !== "completed") ? "VIEWING_COMPLETED" : "APPOINTMENT_UPDATED";
+  await automationEngine.triggerEvent(eventName, {
+    entityType: "appointment",
+    entityId: updated.id,
+    entityName: updated.title,
+    data: eventData,
+    previousData,
+  });
   const row = await db.select(withAgent).from(appointmentsTable).leftJoin(agentsTable, eq(appointmentsTable.assignedAgentId, agentsTable.id)).where(eq(appointmentsTable.id, updated.id));
-  res.json(UpdateAppointmentResponse.parse(row[0]));
+  res.json(UpdateAppointmentResponse.parse(JSON.parse(JSON.stringify(row[0]))));
 });
 
 router.delete("/appointments/:id", async (req, res): Promise<void> => {

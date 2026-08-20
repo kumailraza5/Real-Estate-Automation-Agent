@@ -404,7 +404,13 @@ export interface WorkflowExecution {
   triggeredBy: string;
   /** @nullable */
   triggerEntityId?: number | null;
+  /** @nullable */
+  triggerEntityType?: string | null;
+  /** @nullable */
+  triggerEntityName?: string | null;
   actionsExecuted?: number;
+  /** @nullable */
+  actionResults?: string | null;
   /** @nullable */
   errorMessage?: string | null;
   executedAt: string;

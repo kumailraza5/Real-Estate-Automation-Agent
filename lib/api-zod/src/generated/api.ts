@@ -193,10 +193,10 @@ export const CreateLeadBody = zod.object({
   "status": zod.string().optional(),
   "score": zod.number().optional(),
   "source": zod.string(),
-  "budget": zod.number().optional(),
-  "propertyType": zod.string().optional(),
-  "notes": zod.string().optional(),
-  "assignedAgentId": zod.number().optional()
+  "budget": zod.number().nullish(),
+  "propertyType": zod.string().nullish(),
+  "notes": zod.string().nullish(),
+  "assignedAgentId": zod.number().nullish()
 })
 
 export const CreateLeadResponse = zod.object({
@@ -239,6 +239,7 @@ export const GetLeadResponse = zod.object({
   "notes": zod.string().nullish(),
   "assignedAgentId": zod.number().nullish(),
   "assignedAgentName": zod.string().nullish(),
+  "clientId": zod.number().nullish(),
   "createdAt": zod.string(),
   "updatedAt": zod.string().optional()
 })
@@ -366,12 +367,12 @@ export const ListPropertiesResponseItem = zod.object({
   "title": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
-  "price": zod.number(),
+  "price": zod.coerce.number(),
   "type": zod.string(),
   "status": zod.string(),
-  "bedrooms": zod.number(),
-  "bathrooms": zod.number(),
-  "area": zod.number(),
+  "bedrooms": zod.coerce.number(),
+  "bathrooms": zod.coerce.number(),
+  "area": zod.coerce.number(),
   "description": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "assignedAgentId": zod.number().nullish(),
@@ -388,12 +389,12 @@ export const CreatePropertyBody = zod.object({
   "title": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
-  "price": zod.number(),
+  "price": zod.coerce.number(),
   "type": zod.string(),
   "status": zod.string().optional(),
-  "bedrooms": zod.number(),
-  "bathrooms": zod.number(),
-  "area": zod.number(),
+  "bedrooms": zod.coerce.number(),
+  "bathrooms": zod.coerce.number(),
+  "area": zod.coerce.number(),
   "description": zod.string().optional(),
   "imageUrl": zod.string().optional(),
   "assignedAgentId": zod.number().optional()
@@ -404,12 +405,12 @@ export const CreatePropertyResponse = zod.object({
   "title": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
-  "price": zod.number(),
+  "price": zod.coerce.number(),
   "type": zod.string(),
   "status": zod.string(),
-  "bedrooms": zod.number(),
-  "bathrooms": zod.number(),
-  "area": zod.number(),
+  "bedrooms": zod.coerce.number(),
+  "bathrooms": zod.coerce.number(),
+  "area": zod.coerce.number(),
   "description": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "assignedAgentId": zod.number().nullish(),
@@ -430,12 +431,12 @@ export const GetPropertyResponse = zod.object({
   "title": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
-  "price": zod.number(),
+  "price": zod.coerce.number(),
   "type": zod.string(),
   "status": zod.string(),
-  "bedrooms": zod.number(),
-  "bathrooms": zod.number(),
-  "area": zod.number(),
+  "bedrooms": zod.coerce.number(),
+  "bathrooms": zod.coerce.number(),
+  "area": zod.coerce.number(),
   "description": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "assignedAgentId": zod.number().nullish(),
@@ -455,12 +456,12 @@ export const UpdatePropertyBody = zod.object({
   "title": zod.string().optional(),
   "address": zod.string().optional(),
   "city": zod.string().optional(),
-  "price": zod.number().optional(),
+  "price": zod.coerce.number().optional(),
   "type": zod.string().optional(),
   "status": zod.string().optional(),
-  "bedrooms": zod.number().optional(),
-  "bathrooms": zod.number().optional(),
-  "area": zod.number().optional(),
+  "bedrooms": zod.coerce.number().optional(),
+  "bathrooms": zod.coerce.number().optional(),
+  "area": zod.coerce.number().optional(),
   "description": zod.string().optional(),
   "imageUrl": zod.string().optional(),
   "assignedAgentId": zod.number().nullish()
@@ -471,12 +472,12 @@ export const UpdatePropertyResponse = zod.object({
   "title": zod.string(),
   "address": zod.string(),
   "city": zod.string(),
-  "price": zod.number(),
+  "price": zod.coerce.number(),
   "type": zod.string(),
   "status": zod.string(),
-  "bedrooms": zod.number(),
-  "bathrooms": zod.number(),
-  "area": zod.number(),
+  "bedrooms": zod.coerce.number(),
+  "bathrooms": zod.coerce.number(),
+  "area": zod.coerce.number(),
   "description": zod.string().nullish(),
   "imageUrl": zod.string().nullish(),
   "assignedAgentId": zod.number().nullish(),
@@ -505,10 +506,11 @@ export const ListClientsResponseItem = zod.object({
   "email": zod.string(),
   "phone": zod.string().nullish(),
   "status": zod.string(),
-  "budget": zod.number().nullish(),
+  "budget": zod.coerce.number().nullish(),
   "preferredPropertyType": zod.string().nullish(),
   "assignedAgentId": zod.number().nullish(),
   "assignedAgentName": zod.string().nullish(),
+  "leadId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 export const ListClientsResponse = zod.array(ListClientsResponseItem)
@@ -523,9 +525,10 @@ export const CreateClientBody = zod.object({
   "email": zod.string(),
   "phone": zod.string().optional(),
   "status": zod.string().optional(),
-  "budget": zod.number().optional(),
+  "budget": zod.coerce.number().optional(),
   "preferredPropertyType": zod.string().optional(),
-  "assignedAgentId": zod.number().optional()
+  "assignedAgentId": zod.number().optional(),
+  "leadId": zod.number().optional()
 })
 
 export const CreateClientResponse = zod.object({
@@ -535,10 +538,11 @@ export const CreateClientResponse = zod.object({
   "email": zod.string(),
   "phone": zod.string().nullish(),
   "status": zod.string(),
-  "budget": zod.number().nullish(),
+  "budget": zod.coerce.number().nullish(),
   "preferredPropertyType": zod.string().nullish(),
   "assignedAgentId": zod.number().nullish(),
   "assignedAgentName": zod.string().nullish(),
+  "leadId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -557,10 +561,11 @@ export const GetClientResponse = zod.object({
   "email": zod.string(),
   "phone": zod.string().nullish(),
   "status": zod.string(),
-  "budget": zod.number().nullish(),
+  "budget": zod.coerce.number().nullish(),
   "preferredPropertyType": zod.string().nullish(),
   "assignedAgentId": zod.number().nullish(),
   "assignedAgentName": zod.string().nullish(),
+  "leadId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -578,9 +583,10 @@ export const UpdateClientBody = zod.object({
   "email": zod.string().optional(),
   "phone": zod.string().optional(),
   "status": zod.string().optional(),
-  "budget": zod.number().optional(),
+  "budget": zod.coerce.number().optional(),
   "preferredPropertyType": zod.string().optional(),
-  "assignedAgentId": zod.number().nullish()
+  "assignedAgentId": zod.number().nullish(),
+  "leadId": zod.number().nullish()
 })
 
 export const UpdateClientResponse = zod.object({
@@ -590,10 +596,11 @@ export const UpdateClientResponse = zod.object({
   "email": zod.string(),
   "phone": zod.string().nullish(),
   "status": zod.string(),
-  "budget": zod.number().nullish(),
+  "budget": zod.coerce.number().nullish(),
   "preferredPropertyType": zod.string().nullish(),
   "assignedAgentId": zod.number().nullish(),
   "assignedAgentName": zod.string().nullish(),
+  "leadId": zod.number().nullish(),
   "createdAt": zod.string()
 })
 
@@ -689,7 +696,11 @@ export const ListTasksResponseItem = zod.object({
   "assignedAgentId": zod.number().nullish(),
   "assignedAgentName": zod.string().nullish(),
   "leadId": zod.number().nullish(),
+  "leadName": zod.string().nullish(),
   "clientId": zod.number().nullish(),
+  "sourceWorkflowId": zod.number().nullish(),
+  "sourceWorkflowName": zod.string().nullish(),
+  "isAutomated": zod.boolean().optional(),
   "createdAt": zod.string()
 })
 export const ListTasksResponse = zod.array(ListTasksResponseItem)
@@ -700,15 +711,15 @@ export const ListTasksResponse = zod.array(ListTasksResponseItem)
  */
 export const CreateTaskBody = zod.object({
   "title": zod.string(),
-  "description": zod.string().optional(),
+  "description": zod.string().nullish(),
   "type": zod.string(),
   "status": zod.string().optional(),
   "priority": zod.string().optional(),
-  "dueDate": zod.string().optional(),
-  "dueTime": zod.string().optional(),
-  "assignedAgentId": zod.number().optional(),
-  "leadId": zod.number().optional(),
-  "clientId": zod.number().optional()
+  "dueDate": zod.string().nullish(),
+  "dueTime": zod.string().nullish(),
+  "assignedAgentId": zod.number().nullish(),
+  "leadId": zod.number().nullish(),
+  "clientId": zod.number().nullish()
 })
 
 export const CreateTaskResponse = zod.object({
@@ -761,7 +772,7 @@ export const UpdateTaskParams = zod.object({
 
 export const UpdateTaskBody = zod.object({
   "title": zod.string().optional(),
-  "description": zod.string().optional(),
+  "description": zod.string().nullish(),
   "type": zod.string().optional(),
   "status": zod.string().optional(),
   "priority": zod.string().optional(),
@@ -1076,11 +1087,15 @@ export const GetWorkflowExecutionsResponseItem = zod.object({
   "status": zod.string(),
   "triggeredBy": zod.string(),
   "triggerEntityId": zod.number().nullish(),
+  "triggerEntityType": zod.string().nullish(),
+  "triggerEntityName": zod.string().nullish(),
   "actionsExecuted": zod.number().optional(),
+  "actionResults": zod.string().nullish(),
   "errorMessage": zod.string().nullish(),
   "executedAt": zod.string()
 })
 export const GetWorkflowExecutionsResponse = zod.array(GetWorkflowExecutionsResponseItem)
+
 
 
 /**
@@ -1097,7 +1112,10 @@ export const ListWorkflowExecutionsResponseItem = zod.object({
   "status": zod.string(),
   "triggeredBy": zod.string(),
   "triggerEntityId": zod.number().nullish(),
+  "triggerEntityType": zod.string().nullish(),
+  "triggerEntityName": zod.string().nullish(),
   "actionsExecuted": zod.number().optional(),
+  "actionResults": zod.string().nullish(),
   "errorMessage": zod.string().nullish(),
   "executedAt": zod.string()
 })
