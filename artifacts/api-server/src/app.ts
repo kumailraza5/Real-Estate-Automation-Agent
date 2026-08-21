@@ -1,3 +1,5 @@
+import path from "path";
+import fs from "fs";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -41,7 +43,28 @@ app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 app.use("/api", router);
 
-// Global 404 JSON Handler for unmatched routes
+// Serve static frontend files if built
+const candidateStaticPaths = [
+  path.resolve(process.cwd(), "artifacts/reoa/dist/public"),
+  path.resolve(process.cwd(), "../reoa/dist/public"),
+  path.resolve(process.cwd(), "dist/public"),
+];
+
+const staticPath = candidateStaticPaths.find((p) => fs.existsSync(p));
+
+if (staticPath) {
+  app.use(express.static(staticPath));
+
+  // SPA fallback for all non-API GET routes
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    if (req.method === "GET" && !req.path.startsWith("/api")) {
+      return res.sendFile(path.join(staticPath, "index.html"));
+    }
+    next();
+  });
+}
+
+// Global 404 JSON Handler for unmatched /api routes
 app.use((_req: Request, res: Response) => {
   res.status(404).json({ error: "Not Found" });
 });
