@@ -16,6 +16,17 @@ A modern, high-performance Real Estate CRM & Automation Platform built with Reac
 - **Notifications Center**: Instant alerts, unread counters, mark-as-read, and deep links to triggering entities.
 - **Analytics & Reporting Dashboard**: KPIs, conversion rates, pipeline velocity, stage distribution, agent performance, and activity logs.
 
+## 📖 Implementation Walkthrough
+
+For a source-backed explanation of this project's event triggers, configurable rules,
+workflow execution history, reminder scheduler, and reliability trade-offs, read:
+
+- [Event-driven CRM automation with React, Express and PostgreSQL](https://devkumailraza.site/engineering/real-estate-crm-event-automation.html)
+- [Real Estate Operations project case study](https://devkumailraza.site/case-studies/real-estate-crm-saas.html)
+
+The engineering walkthrough distinguishes implemented safeguards from recommended
+future improvements; it does not claim unverified speed or business metrics.
+
 ## 🏗️ Architecture & Tech Stack
 
 - **Frontend**: React 19, TypeScript, Tailwind CSS, Vite, Lucide Icons, Radix UI, TanStack Query.
